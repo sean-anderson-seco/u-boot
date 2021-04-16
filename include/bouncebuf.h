@@ -8,6 +8,7 @@
 #ifndef __INCLUDE_BOUNCEBUF_H__
 #define __INCLUDE_BOUNCEBUF_H__
 
+#include <linux/dma-direction.h>
 #include <linux/types.h>
 
 /*
@@ -17,7 +18,7 @@
  * requiring the aligned transfer happens, then the bounce buffer is lost upon
  * stop() call.
  */
-#define GEN_BB_READ	(1 << 0)
+#define GEN_BB_READ	DMA_TO_DEVICE
 /*
  * GEN_BB_WRITE -- Data are written into the buffer eg. by DMA hardware.
  * The source buffer starts in an undefined state upon start() call, then the
@@ -25,7 +26,7 @@
  * copied into the destination buffer (if unaligned, otherwise destination
  * buffer is used directly) upon stop() call.
  */
-#define GEN_BB_WRITE	(1 << 1)
+#define GEN_BB_WRITE	DMA_FROM_DEVICE
 /*
  * GEN_BB_RW -- Data are read and written into the buffer eg. by DMA hardware.
  * The source buffer is copied into the bounce buffer (if unaligned, otherwise
@@ -34,7 +35,7 @@
  * into the destination buffer (if unaligned, otherwise destination buffer is
  * used directly) upon stop() call.
  */
-#define GEN_BB_RW	(GEN_BB_READ | GEN_BB_WRITE)
+#define GEN_BB_RW	DMA_BIDIRECTIONAL
 
 struct bounce_buffer {
 	/* Copy of data parameter passed to start() */
@@ -50,7 +51,7 @@ struct bounce_buffer {
 	/* DMA-aligned buffer length */
 	size_t len_aligned;
 	/* Copy of flags parameter passed to start() */
-	unsigned int flags;
+	enum dma_data_direction flags;
 };
 
 /**
@@ -61,7 +62,7 @@ struct bounce_buffer {
  * flags:	flags describing the transaction, see above.
  */
 int bounce_buffer_start(struct bounce_buffer *state, void *data,
-			size_t len, unsigned int flags);
+			size_t len, enum dma_data_direction flags);
 
 /**
  * bounce_buffer_start() -- Start the bounce buffer session with external align check function
@@ -73,7 +74,7 @@ int bounce_buffer_start(struct bounce_buffer *state, void *data,
  * addr_is_aligned: function for checking the alignment instead of the default one
  */
 int bounce_buffer_start_extalign(struct bounce_buffer *state, void *data,
-				 size_t len, unsigned int flags,
+				 size_t len, enum dma_data_direction flags,
 				 size_t alignment,
 				 int (*addr_is_aligned)(struct bounce_buffer *state));
 
