@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <bouncebuf.h>
 #include <asm/cache.h>
+#include <linux/dma-mapping.h>
 
 static int addr_aligned(struct bounce_buffer *state)
 {
@@ -59,9 +60,8 @@ int bounce_buffer_start_extalign(struct bounce_buffer *state, void *data,
 	 * Flush data to RAM so DMA reads can pick it up,
 	 * and any CPU writebacks don't race with DMA writes
 	 */
-	flush_dcache_range((unsigned long)state->bounce_buffer,
-				(unsigned long)(state->bounce_buffer) +
-					state->len_aligned);
+	state->dma_address = dma_map_single(state->bounce_buffer,
+					    state->len_aligned, flags);
 
 	return 0;
 }
@@ -76,12 +76,7 @@ int bounce_buffer_start(struct bounce_buffer *state, void *data,
 
 int bounce_buffer_stop(struct bounce_buffer *state)
 {
-	if (state->flags & GEN_BB_WRITE) {
-		/* Invalidate cache so that CPU can see any newly DMA'd data */
-		invalidate_dcache_range((unsigned long)state->bounce_buffer,
-					(unsigned long)(state->bounce_buffer) +
-						state->len_aligned);
-	}
+	dma_unmap_single(state->dma_address, state->len_aligned, state->flags);
 
 	if (state->bounce_buffer == state->user_buffer)
 		return 0;

@@ -46,6 +46,8 @@ struct bounce_buffer {
 	 * freshly allocated aligned buffer.
 	 */
 	void *bounce_buffer;
+	/* DMA address of the buffer */
+	dma_addr_t dma_address;
 	/* Copy of len parameter passed to start() */
 	size_t len;
 	/* DMA-aligned buffer length */
