@@ -10,6 +10,7 @@
  * Kyle Harris, Nexus Technologies, Inc. kharris@nexus-tech.net
  */
 
+#include <bouncebuf.h>
 #include <config.h>
 #include <common.h>
 #include <command.h>
@@ -170,7 +171,7 @@ struct fsl_esdhc_priv {
 	struct gpio_desc cd_gpio;
 	struct gpio_desc wp_gpio;
 #endif
-	dma_addr_t dma_addr;
+	struct bounce_buffer bbstate;
 };
 
 /* Return the XFERTYP flags for a given command and data packet */
@@ -306,11 +307,11 @@ static void esdhc_setup_dma(struct fsl_esdhc_priv *priv, struct mmc_data *data)
 	else
 		buf = data->dest;
 
-	priv->dma_addr = dma_map_single(buf, trans_bytes,
-					mmc_get_dma_dir(data));
-	if (upper_32_bits(priv->dma_addr))
+	bounce_buffer_start(&priv->bbstate, buf, trans_bytes,
+			    mmc_get_dma_dir(data));
+	if (upper_32_bits(priv->bbstate.dma_address))
 		printf("Cannot use 64 bit addresses with SDMA\n");
-	esdhc_write32(&regs->dsaddr, lower_32_bits(priv->dma_addr));
+	esdhc_write32(&regs->dsaddr, lower_32_bits(priv->bbstate.dma_address));
 	esdhc_write32(&regs->blkattr, data->blocks << 16 | data->blocksize);
 }
 
@@ -558,9 +559,7 @@ static int esdhc_send_cmd_common(struct fsl_esdhc_priv *priv, struct mmc *mmc,
 			 * cache-fill during the DMA operations such as the
 			 * speculative pre-fetching etc.
 			 */
-			dma_unmap_single(priv->dma_addr,
-					 data->blocks * data->blocksize,
-					 mmc_get_dma_dir(data));
+			bounce_buffer_stop(&priv->bbstate);
 			if (IS_ENABLED(CONFIG_MCF5441x) &&
 			    (data->flags & MMC_DATA_READ))
 				sd_swap_dma_buff(data);

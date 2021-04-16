@@ -13,6 +13,7 @@
 #include <common.h>
 #include <command.h>
 #include <cpu_func.h>
+#include <bouncebuf.h>
 #include <errno.h>
 #include <hwconfig.h>
 #include <mmc.h>
@@ -106,7 +107,7 @@ struct fsl_esdhc_priv {
 #endif
 	struct udevice *dev;
 	struct sdhci_adma_desc *adma_desc_table;
-	dma_addr_t dma_addr;
+	struct bounce_buffer bbstate;
 };
 
 /* Return the XFERTYP flags for a given command and data packet */
@@ -243,8 +244,8 @@ static void esdhc_setup_dma(struct fsl_esdhc_priv *priv, struct mmc_data *data)
 	else
 		buf = data->dest;
 
-	priv->dma_addr = dma_map_single(buf, trans_bytes,
-					mmc_get_dma_dir(data));
+	bounce_buffer_start(&priv->bbstate, buf, trans_bytes,
+			    mmc_get_dma_dir(data));
 
 	if (IS_ENABLED(CONFIG_FSL_ESDHC_SUPPORT_ADMA2) &&
 	    priv->adma_desc_table) {
@@ -472,9 +473,7 @@ static int esdhc_send_cmd_common(struct fsl_esdhc_priv *priv, struct mmc *mmc,
 			 * cache-fill during the DMA operations such as the
 			 * speculative pre-fetching etc.
 			 */
-			dma_unmap_single(priv->dma_addr,
-					 data->blocks * data->blocksize,
-					 mmc_get_dma_dir(data));
+			bounce_buffer_stop(&priv->bbstate);
 		}
 	}
 
